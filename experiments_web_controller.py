@@ -8,8 +8,14 @@ with sync_playwright() as p:
 
     print("Starting...")
 
-    controller.navigate("https://www.smartprix.com")
+    controller.goto("https://www.zomato.com/")
 
-    controller.click("Mobiles")
+    controller.fill_input("Search for restaurant, cuisine or a dish", "Biryani")
+
+    controller.click("Biryani - Delivery")
+
+    elements = controller._page.query_selector_all("*")
+    for e in elements:
+        print(e.get_attribute("gpt-link-text"))
 
     print("Done")

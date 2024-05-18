@@ -58,6 +58,7 @@ screenshot = "<img screenshot.jpeg>"
 with sync_playwright() as p:
     browser = web_controller.WebController(p)
 
+
     # browser.navigate("https://www.smartprix.com")
     # browser.click("Mobiles")
 
@@ -67,10 +68,10 @@ with sync_playwright() as p:
         print("cmd from llm", cmd)
         urls = re.findall('https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+', cmd)
         if len(urls) > 0:
-            browser.navigate(urls[0])
+            browser.goto(urls[0])
             return "Continue to find the answer to user's question for the screenshot " + screenshot
         elif len(cmd) < 50:
-            browser.click(link_text=cmd)
+            browser.click(matching_link_text=cmd)
             return "Continue to find the answer to user's question for the screenshot " + screenshot
         return "Please be precise and answer according to:\n" + instructions + screenshot
 

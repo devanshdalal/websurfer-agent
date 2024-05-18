@@ -1,3 +1,3 @@
-from utils import extract_value
+from utils import extract_json
 
-print(extract_value('{"click": "Text in link"}', 'click'))
+print(extract_json('{"scroll"}'))

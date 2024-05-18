@@ -1,14 +1,20 @@
 import base64
 import os
-import re
 
 import requests
 from playwright.sync_api import sync_playwright
 
 import web_controller
-from utils import extract_value
+from utils import extract_json
 
-# API request headers
+SCROLL_JSON_EXPR = """{"scroll": "down"}"""
+
+SEARCH_JSON_EXPR = """{"placeholder": "text visible in the search box", "text": "text to type in the search box"}"""
+
+CLICK_JSON_EXPR = """{"click": "Text in link"}"""
+
+GOTO_JSON_EXPR = """{"url": "url goes here"}"""
+
 api_key = os.environ['OPENAI_API_KEY']
 headers = {
     "Content-Type": "application/json",
@@ -19,7 +25,7 @@ headers = {
 def request_body(messages):
     # Construct the payload
     return {
-        'model': 'gpt-4-vision-preview',
+        'model': 'gpt-4o',
         'messages': messages,
         'temperature': 0,
         'max_tokens': 2000
@@ -39,23 +45,32 @@ with sync_playwright() as p:
     # browser.navigate("https://www.smartprix.com")
     # browser.click("Mobiles")
 
-    prompt = "Tell me the name of a smartphone under Rs 25000 from the https://www.smartprix.com?"
+    prompt = "Tell me a name of a 6 Gb smartphone under Rs 25000 from the https://www.smartprix.com?"
+    # prompt = "Tell me the name of a Vivo smartphone under Rs 10000 from the https://www.smartprix.com?"
+    # prompt = "Find me a biryani restaurant in Karnal city from the https://www.zomato.com/?"
 
     messages = [{
         "role": "system",
         "content": """
             You are a website crawler. You will be given instructions on what to do by browsing. You are connected to a web browser and you will be given the screenshot of the website you are on. The links on the website will be highlighted in red in the screenshot. Always read what is in the screenshot. Be precise and Don't guess link names.
-
+            
+            You can click links on the website by referencing the text inside of the link/button bounded by a red box in the screenshot.
+            by answering in the following JSON format:
+            % s
+            
             You can go to a specific URL by answering with the following JSON format:
-            {"url": "url goes here"}
-
-            You can click links on the website by referencing the text inside of the link/button, by answering in the following JSON format:
-            {"click": "Text in link"}
+            %s
+            
+            You can type in the search box bounded by a green box in the screenshot by answering with the following JSON format:
+            %s
+            
+            You can go to a scroll down a page on current website by answering with the following JSON format:
+            %s
 
             Once you are on a URL and you have found the answer to the user's question, you can answer with a regular message.
-
-            Use google search by set a sub-page like 'https://google.com/search?q=search' if applicable. Prefer to use Google for simple queries. If the user provides a direct URL, go to that one. Do not make up links
-            """
+                   
+           Use google search by set a sub-page like 'https://google.com/search?q=search' if applicable. Prefer to use Google for simple queries. If the user provides a direct URL, go to that one. Do not make up links
+           """ % (CLICK_JSON_EXPR, GOTO_JSON_EXPR, SEARCH_JSON_EXPR, SCROLL_JSON_EXPR)
     }, {
         "role": "user",
         "content": prompt,
@@ -84,12 +99,17 @@ with sync_playwright() as p:
             print(f"Error: {response.status_code}, {response.text}")
             break
 
-        urls = re.findall('https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+', res_text)
-        if len(urls) > 0:
-            controller.navigate(urls[0])
-        else:
-            link_text = extract_value(res_text, 'click')
+        j = extract_json(res_text)
+
+        if 'url' in j:
+            controller.goto(j['url'])
+        elif 'click' in j:
+            link_text = j['click']
             controller.click(link_text=link_text)
+        elif 'scroll' in j:
+            controller.down()
+        elif 'placeholder' in j:
+            controller.fill_input(j['placeholder'], j['text'])
         input("Press Enter to continue...")
         img = encode_image("screenshot.jpeg")
         step_messages = [
@@ -102,11 +122,20 @@ with sync_playwright() as p:
                 "content": [
                     {
                         "type": "image_url",
-                        "image_url": {'url': f'data:image/jpeg;base64,{img}', 'detail': 'low'},
+                        "image_url": {'url': f'data:image/jpeg;base64,{img}', 'detail': 'auto'},
                     },
                     {
                         "type": "text",
-                        "text": "Here's the screenshot of the website you are on right now. You can click on links with {\"click\": \"Link text\"} or you can crawl to another URL if this one is incorrect. If you find the answer to the user's question, you can respond normally. Do not make up link names."
+                        "text":
+                            """Here's the screenshot of the website you are on right now. 
+                            Possible commands are:
+                            """
+                            + GOTO_JSON_EXPR + "\n"
+                            + CLICK_JSON_EXPR + "\n"
+                            + SEARCH_JSON_EXPR + "\n"
+                            + SCROLL_JSON_EXPR + "\n" +
+                            """
+                            If you find the answer to the user's question, you can respond normally. Do not make up link names."""
                     }
                 ]
             }

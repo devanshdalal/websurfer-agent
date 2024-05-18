@@ -32,10 +32,16 @@ def timer(func):
 
 
 def extract_value(text: str, key: str):
-    if (key in text):
-        try:
-            j = json.loads(text)
-            return j[key]
-        except:
-            print("Failed to extract key:", key, 'from', text)
+    json = extract_json(text)
+    if key in json:
+        return json[key]
     return text
+
+
+def extract_json(text: str) -> dict:
+    json_str = text[text.find("{"):text.find("}") + 1]
+    try:
+        return json.loads(json_str)
+    except:
+        print("Failed to extract json out of", text)
+        raise
