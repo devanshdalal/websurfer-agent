@@ -10,12 +10,12 @@ with sync_playwright() as p:
 
     controller.goto("https://www.zomato.com/")
 
-    controller.fill_input("Search for restaurant, cuisine or a dish", "Biryani")
+    controller.type_input("Search for restaurant, cuisine or a dish", "Biryani")
 
     controller.click("Biryani - Delivery")
+    print("Clicked on Biryani - Delivery")
 
-    elements = controller._page.query_selector_all("*")
-    for e in elements:
-        print(e.get_attribute("gpt-link-text"))
+    # print(controller._page.video.path())
+    controller.close()
 
     print("Done")

@@ -10,7 +10,8 @@ from utils import timer
 class WebController:
     def __init__(self, playwright: Playwright):
         self._browser = playwright.chromium.launch(headless=False)
-        self._context = self._browser.new_context()
+        self._context = self._browser.new_context(
+            record_video_dir="videos")
         self._page = self._browser.new_page()
         self._cdp = self._context.new_cdp_session(self._page)
 
@@ -46,12 +47,14 @@ class WebController:
         elements = self._page.query_selector_all("""*""")
         print('try_click_by_text found', len(elements), 'elements.')
         for e in elements:
+            if e.is_hidden() or e.is_disabled() or e.is_enabled() is False or e.is_visible() is False:
+                continue
             if e.get_attribute("placeholder") == link_text or e.text_content() == link_text:
                 e.click()
                 return
         print("Failed to find link text:", link_text)
 
-    def fill_input(self, placeholder, text):
+    def type_input(self, placeholder, text):
         input_boxes = self._page.query_selector_all("""input""")
         print('fill_input found', len(input_boxes), 'elements.')
         search_box = None
@@ -61,14 +64,16 @@ class WebController:
                 break
         if search_box is None:
             print("Failed to find input box with placeholder:", placeholder)
-            for i in input_boxes:
-                print(i.get_attribute("placeholder"), e.text_content(), e.get_attribute("value"),
-                      e.get_attribute("type"), e.get_properties(), e.inner_html())
-            return
+            return False
         search_box.type(text=text, delay=300)
         search_box.dispatch_event('click')
         search_box.press('Enter')
         self.__quick_capture()
+        return True
+
+    def close(self):
+        self._context.close()
+        self._browser.close()
 
     @timer
     def __capture(self):  # Slow
@@ -79,7 +84,7 @@ class WebController:
     @timer
     def __quick_capture(self):
         self.__enhance_for_screenshot()
-        b64_str = self._cdp.send("Page.captureScreenshot")["data"]
+        b64_str = self._cdp.send("Page.captureScreenshot", {"quality": 100, "format": "jpeg"})["data"]
         b64_bytes = b64_str.encode("ascii")
         binary = base64.decodebytes(b64_bytes)
         with open("screenshot.jpeg", "wb") as binary_file:

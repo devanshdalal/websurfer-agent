@@ -1,5 +1,7 @@
+import datetime
 import functools
 import json
+import os
 import time
 from functools import reduce
 
@@ -31,11 +33,20 @@ def timer(func):
     return wrapper
 
 
-def extract_value(text: str, key: str):
-    json = extract_json(text)
-    if key in json:
-        return json[key]
-    return text
+def working_dir():
+    # Get the current date and time
+    now = datetime.datetime.now()
+
+    # Create a string representing the current date and time
+    date_time_string = now.strftime("%Y-%m-%d_%H-%M-%S")
+
+    # Create a folder with the current date and time string as the name
+    os.mkdir(date_time_string)
+
+    # Print the name of the new folder
+    print("Created folder:", date_time_string)
+
+    return date_time_string
 
 
 def extract_json(text: str) -> dict:
@@ -44,4 +55,4 @@ def extract_json(text: str) -> dict:
         return json.loads(json_str)
     except:
         print("Failed to extract json out of", text)
-        raise
+        return None

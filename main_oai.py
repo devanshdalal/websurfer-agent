@@ -9,7 +9,7 @@ from utils import extract_json
 
 SCROLL_JSON_EXPR = """{"scroll": "down"}"""
 
-SEARCH_JSON_EXPR = """{"placeholder": "text visible in the search box", "text": "text to type in the search box"}"""
+SEARCH_JSON_EXPR = """{"placeholder": "text visible in input box", "text": "text to type in input box"}"""
 
 CLICK_JSON_EXPR = """{"click": "Text in link"}"""
 
@@ -41,13 +41,18 @@ def encode_image(image_path):
 # Main execution block.
 with sync_playwright() as p:
     controller = web_controller.WebController(p)
+    # work_dir = working_dir()
 
-    # browser.navigate("https://www.smartprix.com")
-    # browser.click("Mobiles")
-
-    prompt = "Tell me a name of a 6 Gb smartphone under Rs 25000 from the https://www.smartprix.com?"
-    # prompt = "Tell me the name of a Vivo smartphone under Rs 10000 from the https://www.smartprix.com?"
-    # prompt = "Find me a biryani restaurant in Karnal city from the https://www.zomato.com/?"
+    # prompt = "Tell me a name of any 6 Gb smartphone under Rs 25000 from the https://www.smartprix.com?" # lgtm
+    # prompt = "Tell me the name of a Vivo smartphone under Rs 10000 from the https://www.smartprix.com?" # lgtm
+    # prompt = "Find me a biryani restaurant in Karnal city from the https://www.zomato.com/?"  # lgtm, unsatisfactory
+    # prompt = "Find me a highest rated restaurant of Karnal city from the https://www.swiggy.com/?"  # Fails
+    # prompt = "Tell the name of a derma roller with 192 needles & 1 mm size from the https://www.amazon.in/?"  # lgtm
+    # prompt = "Tell the name of a derma roller with 192 needles & 1 mm size from the www.flipkart.com?"  # lgtm
+    prompt = "Tell me the latest order from my amazon account(https://www.amazon.in/)?"  # fails?
+    # prompt = "Tell me which is the most trending open source repository on https://github.com?"  # scary
+    # prompt = "Tell me what is current share price of IRFC using yahoo finance?"  # lgtm
+    # prompt = "Tell me when is the lok sabha 2024 polls in Haryana?"  # not good
 
     messages = [{
         "role": "system",
@@ -64,12 +69,14 @@ with sync_playwright() as p:
             You can type in the search box bounded by a green box in the screenshot by answering with the following JSON format:
             %s
             
-            You can go to a scroll down a page on current website by answering with the following JSON format:
+            If required, you should scroll down a page on current website by answering with the following JSON format:
             %s
 
             Once you are on a URL and you have found the answer to the user's question, you can answer with a regular message.
                    
-           Use google search by set a sub-page like 'https://google.com/search?q=search' if applicable. Prefer to use Google for simple queries. If the user provides a direct URL, go to that one. Do not make up links
+            Use google search by set a sub-page like 'https://google.com/search?q=search' if applicable. Prefer to use Google for simple queries.
+            If the user provides a direct URL, go to that one. Do not make up links. 
+            Always scroll to the end of the page before compiling your final result. 
            """ % (CLICK_JSON_EXPR, GOTO_JSON_EXPR, SEARCH_JSON_EXPR, SCROLL_JSON_EXPR)
     }, {
         "role": "user",
@@ -100,6 +107,9 @@ with sync_playwright() as p:
             break
 
         j = extract_json(res_text)
+        if j is None:
+            print("Failed to extract json out of", res_text)
+            break
 
         if 'url' in j:
             controller.goto(j['url'])
@@ -109,8 +119,12 @@ with sync_playwright() as p:
         elif 'scroll' in j:
             controller.down()
         elif 'placeholder' in j:
-            controller.fill_input(j['placeholder'], j['text'])
-        input("Press Enter to continue...")
+            success = controller.type_input(j['placeholder'], j['text'])
+            if not success:
+                controller.try_click_by_text(j['placeholder'])
+        user_input = input("Press Enter to continue...  or type 'q' to quit..")
+        if user_input == 'q':
+            break
         img = encode_image("screenshot.jpeg")
         step_messages = [
             {
@@ -140,3 +154,5 @@ with sync_playwright() as p:
                 ]
             }
         ]
+    controller.close()
+    print("Done")
