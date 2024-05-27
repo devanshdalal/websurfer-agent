@@ -1,19 +1,24 @@
 import base64
+import os
 import re
+import subprocess
 
 from playwright.sync_api import Playwright
 
-from dom_utils import JSQ_GPT_ATTR_REMOVE, JSQ_ENHANCE_LINK, JSQ_ENHANCE_INPUT
-from utils import timer
+from dom_utils import JSQ_GPT_ATTR_REMOVE, JSQ_ENHANCE_INPUT, JSQ_ENHANCE_LINK
+from utils import timer, equals
 
 
 class WebController:
-    def __init__(self, playwright: Playwright):
+    def __init__(self, playwright: Playwright, wd: str):
         self._browser = playwright.chromium.launch(headless=False)
         self._context = self._browser.new_context(
             record_video_dir="videos")
         self._page = self._browser.new_page()
         self._cdp = self._context.new_cdp_session(self._page)
+        self._wd = wd
+        self._index_number = 0
+        self._screenshot_path = os.path.join(self._wd, "screenshot.jpeg")
 
     def goto(self, url):
         self._page.goto(url, wait_until='domcontentloaded')
@@ -43,15 +48,19 @@ class WebController:
             self.try_click_by_text(link_text)
         self.__quick_capture()
 
+    @timer
     def try_click_by_text(self, link_text):
         elements = self._page.query_selector_all("""*""")
         print('try_click_by_text found', len(elements), 'elements.')
         for e in elements:
             if e.is_hidden() or e.is_disabled() or e.is_enabled() is False or e.is_visible() is False:
                 continue
-            if e.get_attribute("placeholder") == link_text or e.text_content() == link_text:
+            print('Checking element:', e.text_content())
+            if equals(e.get_attribute("placeholder"), link_text) or equals(e.text_content(), link_text):
                 e.click()
                 return
+            if e.text_content() is not None and link_text == e.text_content():
+                print("Found element with text_content:", e.text_content())
         print("Failed to find link text:", link_text)
 
     def type_input(self, placeholder, text):
@@ -59,7 +68,7 @@ class WebController:
         print('fill_input found', len(input_boxes), 'elements.')
         search_box = None
         for e in input_boxes:
-            if e.get_attribute("placeholder") == placeholder or e.text_content() == placeholder:
+            if equals(e.get_attribute("placeholder"), text) or equals(e.text_content(), text):
                 search_box = e
                 break
         if search_box is None:
@@ -76,21 +85,20 @@ class WebController:
         self._browser.close()
 
     @timer
-    def __capture(self):  # Slow
-        self.__enhance_for_screenshot()
-        self._page.screenshot(path="screenshot.jpeg", full_page=False, quality=20, type='jpeg', timeout=100000,
-                              scale="css", caret="initial")
-
-    @timer
     def __quick_capture(self):
-        self.__enhance_for_screenshot()
-        b64_str = self._cdp.send("Page.captureScreenshot", {"quality": 100, "format": "jpeg"})["data"]
+        self.__enhance_for_next_screenshot()
+        b64_str = self._cdp.send("Page.captureScreenshot", {"quality": 40, "format": "jpeg"})["data"]
         b64_bytes = b64_str.encode("ascii")
         binary = base64.decodebytes(b64_bytes)
-        with open("screenshot.jpeg", "wb") as binary_file:
+        with open(self._screenshot_path, "wb") as binary_file:
             binary_file.write(binary)
 
-    def __enhance_for_screenshot(self):
+    def __enhance_for_next_screenshot(self):
+        if os.path.isfile(self._screenshot_path):
+            subprocess.call(["mv", "-f", self._screenshot_path,
+                             os.path.join(self._wd, "screenshot-" + ("%02d" % self._index_number) + ".jpeg")])
+        self._index_number += 1
+        self._page.wait_for_load_state()
         self.__highlight_links()
         self.__highlight_input()
 
@@ -101,7 +109,7 @@ class WebController:
         elements = list(filter(lambda x: x.text_content(), elements))
         print('In __highlight_links found', len(elements), 'elements.')
         for e in elements:
-            if not e.text_content():
+            if e.is_hidden() or e.is_disabled() or not e.text_content():
                 continue
             self._page.evaluate(JSQ_ENHANCE_LINK, e)
 

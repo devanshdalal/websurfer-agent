@@ -33,6 +33,12 @@ def timer(func):
     return wrapper
 
 
+def equals(text1: str, text2: str) -> bool:
+    if (text1 is None or text2 is None):
+        return False
+    return text1.strip() == text2.strip()
+
+
 def working_dir():
     # Get the current date and time
     now = datetime.datetime.now()
@@ -40,13 +46,14 @@ def working_dir():
     # Create a string representing the current date and time
     date_time_string = now.strftime("%Y-%m-%d_%H-%M-%S")
 
+    wd = 'images/' + date_time_string
     # Create a folder with the current date and time string as the name
-    os.mkdir(date_time_string)
+    os.mkdir(wd)
 
     # Print the name of the new folder
-    print("Created folder:", date_time_string)
+    print("Created folder:", wd)
 
-    return date_time_string
+    return wd
 
 
 def extract_json(text: str) -> dict:

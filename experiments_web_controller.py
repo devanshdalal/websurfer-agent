@@ -1,21 +1,36 @@
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, PlaywrightContextManager
 
 import web_controller
 
-# Main execution block.
-with sync_playwright() as p:
-    controller = web_controller.WebController(p)
+
+def f1(p: PlaywrightContextManager):
+    controller = web_controller.WebController(p, "images/2024-05-22_16-45-33")
 
     print("Starting...")
 
-    controller.goto("https://www.zomato.com/")
+    controller.goto("https://semantic-ui.com/modules/dropdown.html")
 
-    controller.type_input("Search for restaurant, cuisine or a dish", "Biryani")
+    controller.try_click_by_text("Gender")
 
-    controller.click("Biryani - Delivery")
-    print("Clicked on Biryani - Delivery")
+    controller.try_click_by_text("Male")
 
     # print(controller._page.video.path())
     controller.close()
 
+    print("Done")
+
+
+def f2(p: PlaywrightContextManager):
+    controller = web_controller.WebController(p, "images/2024-05-22_16-45-33")
+    print("Starting...")
+    controller.goto("https://element-plus.org/en-US/component/checkbox.html")
+    controller.try_click_by_text("Guangzhou")
+    controller.close()
+    print("Done")
+
+
+# Main execution block.
+with sync_playwright() as p:
+    # f1(p)
+    f2(p)
     print("Done")

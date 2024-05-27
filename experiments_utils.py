@@ -1,3 +1,5 @@
-from utils import extract_json
+from utils import working_dir
 
-print(extract_json('{"scroll"}'))
+wd = working_dir()
+
+print(wd)

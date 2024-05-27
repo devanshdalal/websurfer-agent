@@ -5,15 +5,7 @@ import requests
 from playwright.sync_api import sync_playwright
 
 import web_controller
-from utils import extract_json
-
-SCROLL_JSON_EXPR = """{"scroll": "down"}"""
-
-SEARCH_JSON_EXPR = """{"placeholder": "text visible in input box", "text": "text to type in input box"}"""
-
-CLICK_JSON_EXPR = """{"click": "Text in link"}"""
-
-GOTO_JSON_EXPR = """{"url": "url goes here"}"""
+from utils import extract_json, working_dir
 
 api_key = os.environ['OPENAI_API_KEY']
 headers = {
@@ -40,44 +32,77 @@ def encode_image(image_path):
 
 # Main execution block.
 with sync_playwright() as p:
-    controller = web_controller.WebController(p)
-    # work_dir = working_dir()
+    wd = working_dir()
+    controller = web_controller.WebController(p, wd)
 
     # prompt = "Tell me a name of any 6 Gb smartphone under Rs 25000 from the https://www.smartprix.com?" # lgtm
-    # prompt = "Tell me the name of a Vivo smartphone under Rs 10000 from the https://www.smartprix.com?" # lgtm
+    # prompt = "Tell me the name of a Vivo smartphone under Rs 10000 from the https://www.smartprix.com?"  # lgtm
     # prompt = "Find me a biryani restaurant in Karnal city from the https://www.zomato.com/?"  # lgtm, unsatisfactory
     # prompt = "Find me a highest rated restaurant of Karnal city from the https://www.swiggy.com/?"  # Fails
     # prompt = "Tell the name of a derma roller with 192 needles & 1 mm size from the https://www.amazon.in/?"  # lgtm
     # prompt = "Tell the name of a derma roller with 192 needles & 1 mm size from the www.flipkart.com?"  # lgtm
-    prompt = "Tell me the latest order from my amazon account(https://www.amazon.in/)?"  # fails?
-    # prompt = "Tell me which is the most trending open source repository on https://github.com?"  # scary
-    # prompt = "Tell me what is current share price of IRFC using yahoo finance?"  # lgtm
-    # prompt = "Tell me when is the lok sabha 2024 polls in Haryana?"  # not good
+    # prompt = "Tell me the latest order from my amazon account(https://www.amazon.in/)?"  # partial-success
+    # prompt = "Tell me which is the most trending open source repository on https://github.com?"  # very good
+    prompt = "Tell me what is lowest share price of IRFC in past 6 months?"  # lgtm
+    # prompt = "Tell me when is the lok sabha 2024 polls in Haryana?"  # lgtm
 
     messages = [{
         "role": "system",
         "content": """
-            You are a website crawler. You will be given instructions on what to do by browsing. You are connected to a web browser and you will be given the screenshot of the website you are on. The links on the website will be highlighted in red in the screenshot. Always read what is in the screenshot. Be precise and Don't guess link names.
+            You are a website crawler connected to a web browser. Your task is to follow the provided instructions by 
+            browsing the web iteratively. You will receive screenshots of the websites you visit, with links highlighted
+            in red and search boxes highlighted in green.
             
-            You can click links on the website by referencing the text inside of the link/button bounded by a red box in the screenshot.
-            by answering in the following JSON format:
-            % s
+            **Instructions:** 
             
-            You can go to a specific URL by answering with the following JSON format:
-            %s
-            
-            You can type in the search box bounded by a green box in the screenshot by answering with the following JSON format:
-            %s
-            
-            If required, you should scroll down a page on current website by answering with the following JSON format:
-            %s
+            1. **Reading Screenshots**: Always start by carefully examining the content of the screenshot provided to
+            you. Do not make assumptions about the links or content; rely only on what you see. 
 
-            Once you are on a URL and you have found the answer to the user's question, you can answer with a regular message.
-                   
-            Use google search by set a sub-page like 'https://google.com/search?q=search' if applicable. Prefer to use Google for simple queries.
-            If the user provides a direct URL, go to that one. Do not make up links. 
-            Always scroll to the end of the page before compiling your final result. 
-           """ % (CLICK_JSON_EXPR, GOTO_JSON_EXPR, SEARCH_JSON_EXPR, SCROLL_JSON_EXPR)
+            
+            2. **Clicking Links**: 
+            Identify links/buttons bounded by red boxes. 
+            To click a link, respond in the following JSON format: 
+            ```json 
+            { "action": "click", "text": "Link Text" }
+            ``` 
+            Be precise and do not guess link names. 
+
+
+            3. **Navigating to Specific URLs**: 
+            - To go directly to a specific URL, respond with this JSON format: 
+            ```json 
+            { "action": "navigate", "url": "https://example.com" } 
+            ``` 
+            
+            4. **Typing in Search Boxes**: 
+            - To type in a search box bounded by a green box, respond with this JSON format: 
+            ```json 
+            { "action": "type_input", “placeholder”: “text in input box”, "text": "Search Query" } 
+            ``` 
+            
+            5. **Scrolling Down a Page**: 
+            - If you need to scroll down the current webpage, use this JSON format: 
+            ```json 
+            { "action": "scroll" }
+            ``` 
+            
+            6. **Compiling Results**: 
+            - Continue browsing iteratively until you find the answer to the user's question. 
+            - Always scroll to the end of the page before compiling your final result. 
+            - Once you have found the required information, respond with a regular message containing the answer. 
+
+            O7. **Using Google Search**: 
+            - For simple queries, you can set a sub-page like 'https://google.com/search?q=search'. Prefer using Google for such queries. 
+            
+            8. **Direct URLs**: 
+            - If the user provides a direct URL, navigate to it without making up any links. 
+            
+            **Important Guidelines**: 
+            - Always be precise in your actions. 
+            - Never guess the link names or content; rely only on provided screenshots. 
+            - Ensure to scroll to the end of a webpage before summarizing your findings.
+
+           """
     }, {
         "role": "user",
         "content": prompt,
@@ -108,24 +133,25 @@ with sync_playwright() as p:
 
         j = extract_json(res_text)
         if j is None:
-            print("Failed to extract json out of", res_text)
+            print("The final response from llm:", res_text)
             break
 
-        if 'url' in j:
+        action = j['action']
+        if action == 'navigate':
             controller.goto(j['url'])
-        elif 'click' in j:
-            link_text = j['click']
+        elif action == 'click':
+            link_text = j['text']
             controller.click(link_text=link_text)
-        elif 'scroll' in j:
+        elif action == 'scroll':
             controller.down()
-        elif 'placeholder' in j:
+        elif action == 'type_input':
             success = controller.type_input(j['placeholder'], j['text'])
             if not success:
                 controller.try_click_by_text(j['placeholder'])
-        user_input = input("Press Enter to continue...  or type 'q' to quit..")
-        if user_input == 'q':
-            break
-        img = encode_image("screenshot.jpeg")
+        # user_input = input("Press Enter to continue...  or type 'q' to quit..")
+        # if user_input == 'q':
+        #     break
+        img = encode_image(os.path.join(wd, "screenshot.jpeg"))
         step_messages = [
             {
                 "role": "assistant",
@@ -142,17 +168,10 @@ with sync_playwright() as p:
                         "type": "text",
                         "text":
                             """Here's the screenshot of the website you are on right now. 
-                            Possible commands are:
-                            """
-                            + GOTO_JSON_EXPR + "\n"
-                            + CLICK_JSON_EXPR + "\n"
-                            + SEARCH_JSON_EXPR + "\n"
-                            + SCROLL_JSON_EXPR + "\n" +
-                            """
-                            If you find the answer to the user's question, you can respond normally. Do not make up link names."""
+                            If you find the answer to the user's question, you can respond normally. Do not make up link/placeholder names."""
                     }
                 ]
             }
         ]
-    controller.close()
+    # controller.close()
     print("Done")
