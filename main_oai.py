@@ -43,8 +43,11 @@ with sync_playwright() as p:
     # prompt = "Tell the name of a derma roller with 192 needles & 1 mm size from the www.flipkart.com?"  # lgtm
     # prompt = "Tell me the latest order from my amazon account(https://www.amazon.in/)?"  # partial-success
     # prompt = "Tell me which is the most trending open source repository on https://github.com?"  # very good
-    prompt = "Tell me what is lowest share price of IRFC in past 6 months?"  # lgtm
+    # prompt = "Tell me what is lowest share price of IRFC in past 6 months?"  # lgtm
     # prompt = "Tell me when is the lok sabha 2024 polls in Haryana?"  # lgtm
+    # prompt = "Ask chatgpt about names of top 5 most influential applied ai authors of 2024 in Bangalore. website: https://chatgpt.com"  # lgtm
+    # prompt = "what is the iqoo z9x price on amazon.in?"  # lgtm, it solves captcha
+    prompt = "Buy me Philips All-in-One Trimmer for Men Phillips Trimmer from amazon.in"
 
     messages = [{
         "role": "system",

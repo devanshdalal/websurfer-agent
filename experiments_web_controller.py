@@ -1,3 +1,5 @@
+import os.path
+
 from playwright.sync_api import sync_playwright, PlaywrightContextManager
 
 import web_controller
@@ -21,10 +23,16 @@ def f1(p: PlaywrightContextManager):
 
 
 def f2(p: PlaywrightContextManager):
-    controller = web_controller.WebController(p, "images/2024-05-22_16-45-33")
+    storage_state = 's4.json'
+    wd = "images/2024-09-11_16-42-24"
+    controller = web_controller.WebController(p, wd=wd,
+                                              storage_state=storage_state) if os.path.isfile(
+        storage_state) else web_controller.WebController(p, wd=wd)
     print("Starting...")
-    controller.goto("https://element-plus.org/en-US/component/checkbox.html")
-    controller.try_click_by_text("Guangzhou")
+    controller.goto("https://devanshdalal2jira.atlassian.net/jira/servicedesk/projects/ST/queues/custom/1")
+    s = controller.elements_summaries()
+    # controller.page.context.storage_state(path=storage_state)
+    # controller.click("Philips Battery Powered SkinProtect")
     controller.close()
     print("Done")
 

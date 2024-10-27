@@ -1,0 +1,106 @@
+JSQ_DOCUMENT_FIND_BY_TEXT = """
+(text) => {
+    const MATCH = 20;
+
+    const levenshteinDistance = (s, t) => {
+        if (!s.length) return t.length;
+        if (!t.length) return s.length;
+        const arr = [];
+        for (let i = 0; i <= t.length; i++) {
+            arr[i] = [i];
+            for (let j = 1; j <= s.length; j++) {
+                arr[i][j] =
+                    i === 0
+                        ? j
+                        : Math.min(
+                            arr[i - 1][j] + 1,
+                            arr[i][j - 1] + 1,
+                            arr[i - 1][j - 1] + (s[j - 1] === t[i - 1] ? 0 : 1)
+                        );
+            }
+        }
+        return arr[t.length][s.length];
+    };
+
+    function compareStrings(str1, str2, matchTill = MATCH) {
+        // Ensure both inputs are strings, treating null or undefined as empty strings.
+        str1 = str1 === null || str1 === undefined ? '' : str1.trim();
+        str2 = str2 === null || str2 === undefined ? '' : str2.trim();
+
+        // Remove not alphanumeric characters from strings
+        str1 = str1.replace(/\W/g, '')
+        str2 = str2.replace(/\W/g, '')
+
+        // Truncate the strings to the `matchTill` length.
+        str1 = str1.substring(0, matchTill);
+        str2 = str2.substring(0, matchTill);
+
+        // Trim leading and trailing spaces and convert to lower case for case insensitive comparison.
+        str1 = str1.toLowerCase();
+        str2 = str2.toLowerCase();
+
+        // Perform the exact comparison if the strings are short.
+        const strLen = Math.min(str1.length, str2.length);
+        if (strLen <= 5) {
+            return str1 === str2;
+        }
+
+        // Perform a fuzzy comparison based on edit distance.
+        const distance = levenshteinDistance(str1, str2);
+        return distance < 0.1 * strLen;
+    }
+
+    function isTextContentEqual(element, textString) {
+        return compareStrings(element.textContent, textString);
+    }
+
+    function getTextNodesOnly(node) {
+        const textNodes = [];
+        for (let child of node.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE) {
+                textNodes.push(child);
+            }
+        }
+        return textNodes;
+    }
+
+    function isElementClickable(domElement) {
+
+        // Define clickable elements by tag name.
+        const clickableTags = ['button', 'a', 'input'];
+
+        // Check if the element's tag name is one of the standard clickable tags.
+        const isClickableTag = clickableTags.includes(domElement.tagName.toLowerCase());
+
+        // Check if the element has an 'onclick' attribute.
+        const hasOnClickAttribute = domElement.hasAttribute('onclick');
+
+        return isClickableTag || hasOnClickAttribute;
+    }
+
+    const elements = document.querySelectorAll("*");
+    let exactMatch = null;
+    const candidateElements = [];
+    for (let e of elements) {
+        const clickable = isElementClickable(e);
+        if (clickable && isTextContentEqual(e, text)) {
+            exactMatch = e;
+            break;
+        }
+        const textNodes = getTextNodesOnly(e);
+        for (let textNode of textNodes) {
+            if (isTextContentEqual(textNode, text)) {
+                candidateElements.push(e);
+                break
+            }
+        }
+    }
+    if (exactMatch) {
+        console.log('Returning exact match:', exactMatch);
+        return [exactMatch];
+    } else {
+        console.log('No exact match found. Returning candidate elements:', candidateElements);
+        return candidateElements;
+    }
+}
+"""

@@ -2,22 +2,10 @@ import datetime
 import functools
 import json
 import os
+import re
 import time
-from functools import reduce
 
-import spacy
-
-nlp = spacy.load('en_core_web_sm')
-
-
-def similar(text, list_of_texts):
-    text_doc = nlp(text)
-    text_with_scores = list(map(
-        lambda x: {"score": text_doc.similarity(nlp(x)), "text": x}, list_of_texts));
-    match = reduce(lambda x, y: x if x['score'] > y['score'] else y, text_with_scores,
-                   {"score": 0, "text": ""})
-    print("Similar Match:", match, "text:", text, "list:", list_of_texts)
-    return match['text']
+ALPHANUMERIC_REGEXP = '[^a-zA-Z0-9 ]'
 
 
 def timer(func):
@@ -33,10 +21,83 @@ def timer(func):
     return wrapper
 
 
-def equals(text1: str, text2: str) -> bool:
+def return_on_failure(value):
+    def decorate(f):
+        def applicator(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except:
+                print('Error')
+                return value
+
+        return applicator
+
+    return decorate
+
+
+def equals(text1: str, text2: str, match_till=20) -> bool:
     if (text1 is None or text2 is None):
         return False
-    return text1.strip() == text2.strip()
+
+    # Remove all non-alphanumeric characters
+    text1 = re.sub('[^a-zA-Z0-9 ]', '', text1)
+    text2 = re.sub('[^a-zA-Z0-9 ]', '', text2)
+
+    # Convert both strings to lowercase
+    text1 = text1.lower()
+    text2 = text2.lower()
+
+    # Truncate the strings to the `matchTill` length.
+    text1 = text1[:match_till]
+    text2 = text2[:match_till]
+
+    # Perform the exact match comparison if the strings are shorter than 5 characters.
+    smaller_length = min(len(text1), len(text2))
+    if smaller_length <= 5:
+        return text1 == text2
+
+    # Perform a fuzzy comparison based on edit distance.
+    return levenshtein_distance(text1, text2) <= 0.1 * smaller_length
+
+
+def levenshtein_distance(s1, s2):
+    """
+    Compute the Levenshtein Distance between two strings.
+
+    Parameters:
+    s1 (str): The first string.
+    s2 (str): The second string.
+
+    Returns:
+    int: The Levenshtein Distance between s1 and s2.
+    """
+    len_s1 = len(s1)  # Length of the first string
+    len_s2 = len(s2)  # Length of the second string
+
+    # Initialize a matrix of size (len_s1 + 1) x (len_s2 + 1)
+    dp = [[0 for _ in range(len_s2 + 1)] for _ in range(len_s1 + 1)]
+
+    # Initialize the first column and first row of the matrix
+    for i in range(len_s1 + 1):
+        dp[i][0] = i
+
+    for j in range(len_s2 + 1):
+        dp[0][j] = j
+
+    # Compute the Levenshtein distance
+    for i in range(1, len_s1 + 1):
+        for j in range(1, len_s2 + 1):
+            if s1[i - 1] == s2[j - 1]:
+                cost = 0
+            else:
+                cost = 1
+
+            dp[i][j] = min(dp[i - 1][j] + 1,  # Deletion
+                           dp[i][j - 1] + 1,  # Insertion
+                           dp[i - 1][j - 1] + cost)  # Substitution
+
+    # The Levenshtein distance is found at the bottom-right corner of the matrix
+    return dp[len_s1][len_s2]
 
 
 def working_dir():
@@ -63,3 +124,7 @@ def extract_json(text: str) -> dict:
     except:
         print("Failed to extract json out of", text)
         return None
+
+
+def alpha_numeric(text):
+    return re.sub(ALPHANUMERIC_REGEXP, '', text)
